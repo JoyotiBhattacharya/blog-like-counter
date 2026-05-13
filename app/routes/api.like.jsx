@@ -1,7 +1,3 @@
-// IMPORTANT:
-// Your current file is missing the final closing braces.
-// Replace the ENTIRE file with this exact code.
-
 function jsonResponse(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -14,6 +10,7 @@ function jsonResponse(data, status = 200) {
   });
 }
 
+// Test API
 export async function loader() {
   return jsonResponse({
     success: true,
@@ -21,6 +18,7 @@ export async function loader() {
   });
 }
 
+// Handle CORS preflight
 export async function options() {
   return new Response(null, {
     status: 204,
@@ -32,9 +30,16 @@ export async function options() {
   });
 }
 
+// Main POST handler
 export async function action({ request }) {
+  let articleId;
+  const shop = "my-new-app-8hk4xewp.myshopify.com";
+  const accessToken = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
+
   try {
-    let { articleId } = await request.json();
+    // Parse request body
+    const body = await request.json();
+    articleId = body.articleId;
 
     if (!articleId) {
       return jsonResponse({
@@ -43,14 +48,12 @@ export async function action({ request }) {
       });
     }
 
-    // Convert numeric article ID to Shopify GraphQL GID
+    // Convert numeric ID to Shopify GraphQL GID
     if (!String(articleId).startsWith("gid://")) {
       articleId = `gid://shopify/Article/${articleId}`;
     }
 
-    const shop = "my-new-app-8hk4xewp.myshopify.com";
-    const accessToken = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
-
+    // Ensure token exists
     if (!accessToken) {
       return jsonResponse({
         success: false,
@@ -58,7 +61,9 @@ export async function action({ request }) {
       });
     }
 
-    // STEP 1: Read current like_count metafield
+    // -----------------------------
+    // STEP 1: Read current like_count
+    // -----------------------------
     const readQuery = `
       query GetArticle($id: ID!) {
         article(id: $id) {
@@ -88,24 +93,47 @@ export async function action({ request }) {
 
     const readData = await readResponse.json();
 
+    // Top-level GraphQL errors
     if (readData.errors?.length) {
       return jsonResponse({
         success: false,
         error: readData.errors[0].message,
+        debug: {
+          stage: "read_query",
+          articleId,
+          response: readData,
+        },
+      });
+    }
+
+    // Article not found
+    if (!readData?.data?.article) {
+      return jsonResponse({
+        success: false,
+        error: "Article not found",
+        debug: {
+          stage: "article_lookup",
+          articleId,
+          response: readData,
+        },
       });
     }
 
     const currentValue =
-      readData?.data?.article?.metafield?.value || "0";
+      readData.data.article.metafield?.value || "0";
 
     const currentLikes = parseInt(currentValue, 10) || 0;
     const newLikes = currentLikes + 1;
 
-    // STEP 2: Update like_count metafield
+    // -----------------------------
+    // STEP 2: Update metafield
+    // -----------------------------
     const mutation = `
       mutation SetMetafields($metafields: [MetafieldsSetInput!]!) {
         metafieldsSet(metafields: $metafields) {
           metafields {
+            namespace
+            key
             value
           }
           userErrors {
@@ -143,13 +171,20 @@ export async function action({ request }) {
 
     const updateData = await updateResponse.json();
 
+    // Top-level GraphQL errors
     if (updateData.errors?.length) {
       return jsonResponse({
         success: false,
         error: updateData.errors[0].message,
+        debug: {
+          stage: "update_query",
+          articleId,
+          response: updateData,
+        },
       });
     }
 
+    // User errors from metafieldsSet
     const userErrors =
       updateData?.data?.metafieldsSet?.userErrors || [];
 
@@ -157,6 +192,11 @@ export async function action({ request }) {
       return jsonResponse({
         success: false,
         error: userErrors[0].message,
+        debug: {
+          stage: "metafields_set",
+          articleId,
+          userErrors,
+        },
       });
     }
 
@@ -170,8 +210,22 @@ export async function action({ request }) {
 
     return jsonResponse({
       success: false,
-      error: error?.message || String(error) || "Unknown error",
-      stack: error?.stack || null,
+      error:
+        error && error.message
+          ? error.message
+          : error
+          ? String(error)
+          : "Unknown error",
+      stack:
+        error && error.stack
+          ? error.stack
+          : null,
+      debug: {
+        articleId,
+        hasAccessToken: !!accessToken,
+        shop,
+        errorType: typeof error,
+      },
     });
   }
 }
