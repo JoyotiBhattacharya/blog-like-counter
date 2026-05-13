@@ -43,7 +43,7 @@ export async function action({ request }) {
     }
 
     // Convert numeric ID to Shopify GID if needed
-  articleId = `gid://shopify/OnlineStoreArticle/${articleId}`;
+  articleId = `gid://shopify/Article/${articleId}`;
 
     const shop = "my-new-app-8hk4xewp.myshopify.com";
     const accessToken = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
