@@ -1,3 +1,5 @@
+// Replace your entire app/routes/api.like.jsx with this code
+
 function jsonResponse(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -10,7 +12,6 @@ function jsonResponse(data, status = 200) {
   });
 }
 
-// Test API in browser
 export async function loader() {
   return jsonResponse({
     success: true,
@@ -18,7 +19,6 @@ export async function loader() {
   });
 }
 
-// Handle CORS preflight request
 export async function options() {
   return new Response(null, {
     status: 204,
@@ -30,7 +30,6 @@ export async function options() {
   });
 }
 
-// Main POST request
 export async function action({ request }) {
   try {
     let { articleId } = await request.json();
@@ -42,8 +41,10 @@ export async function action({ request }) {
       });
     }
 
-    // Convert numeric ID to Shopify GID if needed
-  articleId = `gid://shopify/Article/${articleId}`;
+    // Convert numeric article ID to Shopify GraphQL GID
+    if (!String(articleId).startsWith("gid://")) {
+      articleId = `gid://shopify/Article/${articleId}`;
+    }
 
     const shop = "my-new-app-8hk4xewp.myshopify.com";
     const accessToken = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
@@ -98,7 +99,7 @@ export async function action({ request }) {
     const currentLikes = parseInt(currentValue, 10) || 0;
     const newLikes = currentLikes + 1;
 
-    // STEP 2: Update metafield
+    // STEP 2: Update like_count metafield
     const mutation = `
       mutation SetMetafields($metafields: [MetafieldsSetInput!]!) {
         metafieldsSet(metafields: $metafields) {
@@ -157,7 +158,7 @@ export async function action({ request }) {
       });
     }
 
-    // Success response
+    // Success
     return jsonResponse({
       success: true,
       likes: newLikes,
@@ -165,7 +166,7 @@ export async function action({ request }) {
   } catch (error) {
     return jsonResponse({
       success: false,
-      error: error.message,
+      error: error.message || "Unknown error",
     });
   }
 }
