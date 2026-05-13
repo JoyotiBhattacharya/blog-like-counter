@@ -1,4 +1,6 @@
-// Replace your entire app/routes/api.like.jsx with this code
+// IMPORTANT:
+// Your current file is missing the final closing braces.
+// Replace the ENTIRE file with this exact code.
 
 function jsonResponse(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -164,9 +166,12 @@ export async function action({ request }) {
       likes: newLikes,
     });
   } catch (error) {
+    console.error("Like API Error:", error);
+
     return jsonResponse({
       success: false,
-      error: error.message || "Unknown error",
+      error: error?.message || String(error) || "Unknown error",
+      stack: error?.stack || null,
     });
   }
 }
