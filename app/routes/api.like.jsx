@@ -1,26 +1,26 @@
 import { json } from "react-router";
-import { authenticate } from "../shopify.server";
+import shopify from "../shopify.server";
 
 export async function action({ request }) {
   try {
-    const { admin } = await authenticate.admin(request);
+    // App Proxy requests are authenticated with authenticate.public.appProxy
+    const { admin } = await shopify.authenticate.public.appProxy(request);
+
     const { articleId } = await request.json();
 
     if (!articleId) {
-      return json(
-        {
-          success: false,
-          error: "Article ID is required",
-        },
-        { status: 400 }
-      );
+      return json({
+        success: false,
+        error: "Article ID is required",
+      });
     }
 
-    // Get current like count
+    // Read current metafield
     const query = `
       query GetArticle($id: ID!) {
         article(id: $id) {
           metafield(namespace: "custom", key: "like_count") {
+            id
             value
           }
         }
@@ -28,34 +28,19 @@ export async function action({ request }) {
     `;
 
     const queryResponse = await admin.graphql(query, {
-      variables: {
-        id: articleId,
-      },
+      variables: { id: articleId },
     });
 
     const queryData = await queryResponse.json();
 
-    const currentLikes = parseInt(
-      queryData?.data?.article?.metafield?.value || "0",
-      10
-    );
-
+    const metafield = queryData?.data?.article?.metafield;
+    const currentLikes = parseInt(metafield?.value || "0", 10);
     const newLikes = currentLikes + 1;
 
-    // Update metafield
+    // Create or update metafield
     const mutation = `
-      mutation UpdateLikes($ownerId: ID!, $value: String!) {
-        metafieldsSet(
-          metafields: [
-            {
-              namespace: "custom"
-              key: "like_count"
-              type: "number_integer"
-              ownerId: $ownerId
-              value: $value
-            }
-          ]
-        ) {
+      mutation SetMetafields($metafields: [MetafieldsSetInput!]!) {
+        metafieldsSet(metafields: $metafields) {
           metafields {
             id
             value
@@ -70,23 +55,27 @@ export async function action({ request }) {
 
     const mutationResponse = await admin.graphql(mutation, {
       variables: {
-        ownerId: articleId,
-        value: String(newLikes),
+        metafields: [
+          {
+            ownerId: articleId,
+            namespace: "custom",
+            key: "like_count",
+            type: "number_integer",
+            value: String(newLikes),
+          },
+        ],
       },
     });
 
     const mutationData = await mutationResponse.json();
+    const userErrors =
+      mutationData?.data?.metafieldsSet?.userErrors || [];
 
-    const errors = mutationData?.data?.metafieldsSet?.userErrors || [];
-
-    if (errors.length > 0) {
-      return json(
-        {
-          success: false,
-          error: errors[0].message,
-        },
-        { status: 400 }
-      );
+    if (userErrors.length > 0) {
+      return json({
+        success: false,
+        error: userErrors[0].message,
+      });
     }
 
     return json({
@@ -96,12 +85,9 @@ export async function action({ request }) {
   } catch (error) {
     console.error("Like API Error:", error);
 
-    return json(
-      {
-        success: false,
-        error: error.message,
-      },
-      { status: 500 }
-    );
+    return json({
+      success: false,
+      error: error.message,
+    });
   }
 }

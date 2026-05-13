@@ -49,3 +49,7 @@ redirect_urls = [ "https://example.com/api/auth" ]
 
 [build]
 automatically_update_urls_on_dev = true
+[app_proxy]
+url = "https://blog-like-counter.vercel.app/api.like"
+subpath = "blog-like"
+prefix = "apps"
