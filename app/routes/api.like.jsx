@@ -19,8 +19,15 @@ export async function action({ request }) {
     const shop = "my-new-app-8hk4xewp.myshopify.com";
     const accessToken = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
 
-    // Read current metafield
-    const query = `
+    if (!accessToken) {
+      return Response.json({
+        success: false,
+        error: "SHOPIFY_ADMIN_ACCESS_TOKEN is missing",
+      });
+    }
+
+    // STEP 1: Read current like_count metafield
+    const readQuery = `
       query GetArticle($id: ID!) {
         article(id: $id) {
           metafield(namespace: "custom", key: "like_count") {
@@ -30,8 +37,8 @@ export async function action({ request }) {
       }
     `;
 
-    const queryResponse = await fetch(
-      `https://${shop}/admin/api/2026-07/graphql.json`,
+    const readResponse = await fetch(
+      `https://${shop}/admin/api/2026-04/graphql.json`,
       {
         method: "POST",
         headers: {
@@ -39,7 +46,7 @@ export async function action({ request }) {
           "X-Shopify-Access-Token": accessToken,
         },
         body: JSON.stringify({
-          query,
+          query: readQuery,
           variables: {
             id: articleId,
           },
@@ -47,19 +54,21 @@ export async function action({ request }) {
       }
     );
 
-    const queryData = await queryResponse.json();
+    const readData = await readResponse.json();
 
     const currentValue =
-      queryData?.data?.article?.metafield?.value || "0";
+      readData?.data?.article?.metafield?.value || "0";
 
     const currentLikes = parseInt(currentValue, 10) || 0;
     const newLikes = currentLikes + 1;
 
-    // Update metafield
+    // STEP 2: Save updated like_count metafield
     const mutation = `
       mutation SetMetafields($metafields: [MetafieldsSetInput!]!) {
         metafieldsSet(metafields: $metafields) {
           metafields {
+            namespace
+            key
             value
           }
           userErrors {
@@ -70,8 +79,8 @@ export async function action({ request }) {
       }
     `;
 
-    const mutationResponse = await fetch(
-      `https://${shop}/admin/api/2026-07/graphql.json`,
+    const updateResponse = await fetch(
+      `https://${shop}/admin/api/2026-04/graphql.json`,
       {
         method: "POST",
         headers: {
@@ -95,10 +104,10 @@ export async function action({ request }) {
       }
     );
 
-    const mutationData = await mutationResponse.json();
+    const updateData = await updateResponse.json();
 
     const userErrors =
-      mutationData?.data?.metafieldsSet?.userErrors || [];
+      updateData?.data?.metafieldsSet?.userErrors || [];
 
     if (userErrors.length > 0) {
       return Response.json({
@@ -107,6 +116,7 @@ export async function action({ request }) {
       });
     }
 
+    // STEP 3: Return updated count to frontend
     return Response.json({
       success: true,
       likes: newLikes,
