@@ -1,16 +1,42 @@
+function jsonResponse(data, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type",
+    },
+  });
+}
+
+// GET request test
 export async function loader() {
-  return Response.json({
+  return jsonResponse({
     success: true,
     message: "API is working",
   });
 }
 
+// CORS preflight support
+export async function options() {
+  return new Response(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type",
+    },
+  });
+}
+
+// POST request
 export async function action({ request }) {
   try {
     const { articleId } = await request.json();
 
     if (!articleId) {
-      return Response.json({
+      return jsonResponse({
         success: false,
         error: "Article ID is required",
       });
@@ -20,7 +46,7 @@ export async function action({ request }) {
     const accessToken = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
 
     if (!accessToken) {
-      return Response.json({
+      return jsonResponse({
         success: false,
         error: "SHOPIFY_ADMIN_ACCESS_TOKEN is missing",
       });
@@ -55,6 +81,13 @@ export async function action({ request }) {
     );
 
     const readData = await readResponse.json();
+
+    if (readData.errors) {
+      return jsonResponse({
+        success: false,
+        error: readData.errors[0].message,
+      });
+    }
 
     const currentValue =
       readData?.data?.article?.metafield?.value || "0";
@@ -106,23 +139,30 @@ export async function action({ request }) {
 
     const updateData = await updateResponse.json();
 
+    if (updateData.errors) {
+      return jsonResponse({
+        success: false,
+        error: updateData.errors[0].message,
+      });
+    }
+
     const userErrors =
       updateData?.data?.metafieldsSet?.userErrors || [];
 
     if (userErrors.length > 0) {
-      return Response.json({
+      return jsonResponse({
         success: false,
         error: userErrors[0].message,
       });
     }
 
     // STEP 3: Return updated count to frontend
-    return Response.json({
+    return jsonResponse({
       success: true,
       likes: newLikes,
     });
   } catch (error) {
-    return Response.json({
+    return jsonResponse({
       success: false,
       error: error.message,
     });

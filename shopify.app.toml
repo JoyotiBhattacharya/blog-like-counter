@@ -1,13 +1,35 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
 client_id = "02615c1c0b64c6036ea21db49c3772a8"
+name = "blog-like-counter"
 application_url = "https://example.com"
 embedded = true
-name = "blog-like-counter"
+
+[build]
+automatically_update_urls_on_dev = true
+
+[webhooks]
+api_version = "2026-07"
+
+  [[webhooks.subscriptions]]
+  topics = [ "app/scopes_update" ]
+  uri = "/webhooks/app/scopes_update"
+
+  [[webhooks.subscriptions]]
+  topics = [ "app/uninstalled" ]
+  uri = "/webhooks/app/uninstalled"
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = "write_products,write_metaobjects,write_metaobject_definitions,read_content,write_content"
+scopes = "read_content,write_content,write_metaobject_definitions,write_metaobjects,write_products"
+
+[auth]
+redirect_urls = [ "https://example.com/api/auth" ]
+
+[app_proxy]
+url = "https://blog-like-counter.vercel.app/api/like"
+subpath = "blog-like"
+prefix = "apps"
 
 [product.metafields.app.demo_info]
 type = "single_line_text_field"
@@ -32,24 +54,3 @@ required = true
 [metaobjects.app.example.fields.description]
 name = "Description"
 type = "multi_line_text_field"
-
-[webhooks]
-api_version = "2026-07"
-
-  [[webhooks.subscriptions]]
-  uri = "/webhooks/app/uninstalled"
-  topics = [ "app/uninstalled" ]
-
-  [[webhooks.subscriptions]]
-  uri = "/webhooks/app/scopes_update"
-  topics = [ "app/scopes_update" ]
-
-[auth]
-redirect_urls = [ "https://example.com/api/auth" ]
-
-[build]
-automatically_update_urls_on_dev = true
-[app_proxy]
-url = "https://blog-like-counter.vercel.app/api/like"
-subpath = "blog-like"
-prefix = "apps"
