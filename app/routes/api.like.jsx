@@ -10,7 +10,10 @@ export async function loader() {
 
 export async function action({ request }) {
   try {
+    // Authenticate App Proxy request
     const { admin } = await shopify.authenticate.public.appProxy(request);
+
+    // Get articleId from frontend request body
     const { articleId } = await request.json();
 
     if (!articleId) {
@@ -20,7 +23,7 @@ export async function action({ request }) {
       });
     }
 
-    // Get current like count
+    // Read current metafield value
     const query = `
       query GetArticle($id: ID!) {
         article(id: $id) {
@@ -32,18 +35,20 @@ export async function action({ request }) {
     `;
 
     const queryResponse = await admin.graphql(query, {
-      variables: { id: articleId },
+      variables: {
+        id: articleId,
+      },
     });
 
-    const queryData = await queryResponse.json();
+    const queryResult = await queryResponse.json();
 
     const currentValue =
-      queryData?.data?.article?.metafield?.value || "0";
+      queryResult?.data?.article?.metafield?.value || "0";
 
     const currentLikes = parseInt(currentValue, 10) || 0;
     const newLikes = currentLikes + 1;
 
-    // Save updated like count
+    // Save updated value to metafield
     const mutation = `
       mutation SetMetafields($metafields: [MetafieldsSetInput!]!) {
         metafieldsSet(metafields: $metafields) {
@@ -72,10 +77,10 @@ export async function action({ request }) {
       },
     });
 
-    const mutationData = await mutationResponse.json();
+    const mutationResult = await mutationResponse.json();
 
     const userErrors =
-      mutationData?.data?.metafieldsSet?.userErrors || [];
+      mutationResult?.data?.metafieldsSet?.userErrors || [];
 
     if (userErrors.length > 0) {
       return json({
@@ -84,6 +89,7 @@ export async function action({ request }) {
       });
     }
 
+    // Return updated like count
     return json({
       success: true,
       likes: newLikes,
@@ -93,7 +99,7 @@ export async function action({ request }) {
 
     return json({
       success: false,
-      error: error.message,
+      error: error.message || "Something went wrong",
     });
   }
 }
