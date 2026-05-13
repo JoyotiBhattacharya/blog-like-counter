@@ -33,13 +33,19 @@ export async function options() {
 // POST request
 export async function action({ request }) {
   try {
-    const { articleId } = await request.json();
+    let { articleId } = await request.json();
 
     if (!articleId) {
       return jsonResponse({
         success: false,
         error: "Article ID is required",
       });
+    }
+
+    // Shopify article.id in Liquid is usually numeric (e.g. 1234567890).
+    // Convert it to a valid GraphQL GID if needed.
+    if (!String(articleId).startsWith("gid://")) {
+      articleId = `gid://shopify/Article/${articleId}`;
     }
 
     const shop = "my-new-app-8hk4xewp.myshopify.com";
@@ -82,10 +88,13 @@ export async function action({ request }) {
 
     const readData = await readResponse.json();
 
-    if (readData.errors) {
+    if (readData.errors?.length) {
       return jsonResponse({
         success: false,
         error: readData.errors[0].message,
+        debug: {
+          articleId,
+        },
       });
     }
 
@@ -139,7 +148,7 @@ export async function action({ request }) {
 
     const updateData = await updateResponse.json();
 
-    if (updateData.errors) {
+    if (updateData.errors?.length) {
       return jsonResponse({
         success: false,
         error: updateData.errors[0].message,
